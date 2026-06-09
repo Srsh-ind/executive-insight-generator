@@ -2,6 +2,14 @@ import pandas as pd
 
 def analyze_data(file_path):
     df = pd.read_csv(file_path)
+    df.columns = df.columns.str.strip()
+
+    df["Region"] = df["Region"].astype(str).str.strip()
+    df["Region"] = df["Region"].replace({
+        "ΝΑ": "NA",
+        "ΕΜΕΑ": "EMEA",
+        "ΑΡАС": "APAC"
+    })
 
     total_revenue = df['Revenue'].sum()
 
@@ -15,8 +23,8 @@ def analyze_data(file_path):
     avg_churn = df['Churn'].mean()
 
     return {
-        "total_revenue": total_revenue,
-        "growth": round(growth, 2),
-        "top_region": top_region,
-        "avg_churn": round(avg_churn, 2)
-    }
+        "total_revenue": int(total_revenue),
+        "growth": float(round(growth, 2)),
+        "top_region": str(top_region).strip(),
+        "avg_churn": float(round(avg_churn, 2))
+}

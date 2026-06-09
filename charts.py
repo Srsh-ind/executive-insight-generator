@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -5,6 +6,15 @@ import matplotlib.pyplot as plt
 def generate_chart(file_path):
 
     df = pd.read_csv(file_path)
+    df.columns = df.columns.str.strip()
+    df["Region"] = df["Region"].astype(str).str.strip()
+    df["Region"] = df["Region"].replace({
+        "ΝΑ": "NA",
+        "ΕΜΕΑ": "EMEA",
+        "ΑΡАС": "APAC"
+    })
+
+    os.makedirs("outputs", exist_ok=True)
 
     chart_file = "outputs/revenue_chart.png"
 
