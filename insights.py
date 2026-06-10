@@ -1,22 +1,6 @@
-from transformers import pipeline
-
-generator = None
-
-def get_generator():
-    global generator
-    if generator is None:
-        generator = pipeline(
-            "text-generation",
-            model="Qwen/Qwen2.5-3B-Instruct",
-            device_map="auto"
-        )
-    return generator
+import requests
 
 def extract_sections(text):
-    # Keep only generated part after the LAST INSIGHTS:
-    if "INSIGHTS:" in text:
-        text = text[text.rfind("INSIGHTS:"):]
-
     insights = []
     risks = []
     recommendations = []
@@ -25,25 +9,27 @@ def extract_sections(text):
     for line in text.splitlines():
         line = line.strip()
 
-        if line.startswith("INSIGHTS:"):
+        if line.upper().startswith("INSIGHTS"):
             section = "insights"
             continue
-        elif line.startswith("RISKS:"):
+
+        if line.upper().startswith("RISKS"):
             section = "risks"
             continue
-        elif line.startswith("RECOMMENDATIONS:"):
+
+        if line.upper().startswith("RECOMMENDATIONS"):
             section = "recommendations"
             continue
-        elif line.startswith("---") or line.startswith("**Additional"):
-            break
 
         if line.startswith("-"):
             item = line[1:].strip()
 
             if section == "insights" and len(insights) < 3:
                 insights.append(item)
+
             elif section == "risks" and len(risks) < 2:
                 risks.append(item)
+
             elif section == "recommendations" and len(recommendations) < 3:
                 recommendations.append(item)
 
@@ -51,18 +37,16 @@ def extract_sections(text):
 
 
 def generate_insights(metrics):
-    model = get_generator()
-
     prompt = f"""
-You are a senior business analyst.
+You are a senior strategy consultant creating a boardroom-ready business review.
 
 Business metrics:
 Total revenue: ${metrics['total_revenue']:,}
 Growth: {metrics['growth']}%
-Top region: {metrics['top_region']}
+Top performing region: {metrics['top_region']}
 Average churn: {metrics['avg_churn']}%
 
-Return ONLY the following format. Do not add extra sections or explanations.
+Return ONLY this format. Do not add extra sections or explanations.
 
 INSIGHTS:
 - ...
@@ -79,18 +63,123 @@ RECOMMENDATIONS:
 - ...
 """
 
-    response = model(
-        prompt,
-        max_new_tokens=180,
-        do_sample=False,
-        temperature=0.0
+    response = requests.post(
+        "http://localhost:8000/v1/chat/completions",
+        json={
+            "model": "Qwen/Qwen2-7B-Instruct",
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.2,
+            "max_tokens": 350
+        },
+        timeout=120
     )
 
-    generated_text = response[0]["generated_text"]
+    response.raise_for_status()
 
-    insights, risks, recommendations = extract_sections(generated_text)
+    text = response.json()["choices"][0]["message"]["content"]
+
+    insights, risks, recommendations = extract_sections(text)
 
     return insights, risks, recommendations
+
+
+
+
+# ++from transformers import pipeline
+
+# generator = None
+
+# def get_generator():
+#     global generator
+#     if generator is None:
+#         generator = pipeline(
+#             "text-generation",
+#             model="Qwen/Qwen2.5-3B-Instruct",
+#             device_map="auto"
+#         )
+#     return generator
+
+# def extract_sections(text):
+#     # Keep only generated part after the LAST INSIGHTS:
+#     if "INSIGHTS:" in text:
+#         text = text[text.rfind("INSIGHTS:"):]
+
+#     insights = []
+#     risks = []
+#     recommendations = []
+#     section = None
+
+#     for line in text.splitlines():
+#         line = line.strip()
+
+#         if line.startswith("INSIGHTS:"):
+#             section = "insights"
+#             continue
+#         elif line.startswith("RISKS:"):
+#             section = "risks"
+#             continue
+#         elif line.startswith("RECOMMENDATIONS:"):
+#             section = "recommendations"
+#             continue
+#         elif line.startswith("---") or line.startswith("**Additional"):
+#             break
+
+#         if line.startswith("-"):
+#             item = line[1:].strip()
+
+#             if section == "insights" and len(insights) < 3:
+#                 insights.append(item)
+#             elif section == "risks" and len(risks) < 2:
+#                 risks.append(item)
+#             elif section == "recommendations" and len(recommendations) < 3:
+#                 recommendations.append(item)
+
+#     return insights, risks, recommendations
+
+
+# def generate_insights(metrics):
+#     model = get_generator()
+
+#     prompt = f"""
+# You are a senior business analyst.
+
+# Business metrics:
+# Total revenue: ${metrics['total_revenue']:,}
+# Growth: {metrics['growth']}%
+# Top region: {metrics['top_region']}
+# Average churn: {metrics['avg_churn']}%
+
+# Return ONLY the following format. Do not add extra sections or explanations.
+
+# INSIGHTS:
+# - ...
+# - ...
+# - ...
+
+# RISKS:
+# - ...
+# - ...
+
+# RECOMMENDATIONS:
+# - ...
+# - ...
+# - ...
+# """
+
+#     response = model(
+#         prompt,
+#         max_new_tokens=180,
+#         do_sample=False,
+#         temperature=0.0
+#     )
+
+#     generated_text = response[0]["generated_text"]
+
+#     insights, risks, recommendations = extract_sections(generated_text)
+
+#     return insights, risks, recommendations
 
 
 # Future AMD/LLM Integration
